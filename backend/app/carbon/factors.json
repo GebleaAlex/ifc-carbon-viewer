@@ -1,0 +1,77 @@
+{
+  "_comment": "Indicative cradle-to-gate (A1-A3) embodied carbon factors. Order-of-magnitude values in the range of public generic databases such as the ICE database; they are NOT product-specific and must not be used for reporting. Replace with EPD values for real assessments. Timber excludes biogenic carbon storage.",
+  "factors": [
+    {
+      "category": "concrete",
+      "label": "Concrete",
+      "density_kg_m3": 2400,
+      "factor_kgco2e_per_kg": 0.13,
+      "color": "#94a3b8",
+      "keywords": ["concrete", "beton", "cement", "c20", "c25", "c30", "c35", "c40", "c50", "rc "],
+      "note": "Generic in-situ concrete around C30/37 with nominal reinforcement."
+    },
+    {
+      "category": "steel",
+      "label": "Steel",
+      "density_kg_m3": 7850,
+      "factor_kgco2e_per_kg": 1.55,
+      "color": "#f97316",
+      "keywords": ["steel", "stahl", "otel", "s235", "s275", "s355", "heb", "hea", "ipe", "rebar"],
+      "note": "Structural sections, world-average recycled content."
+    },
+    {
+      "category": "masonry",
+      "label": "Masonry",
+      "density_kg_m3": 1900,
+      "factor_kgco2e_per_kg": 0.21,
+      "color": "#b45309",
+      "keywords": ["brick", "masonry", "clay", "block", "caramida", "ziegel"],
+      "note": "Fired clay brick."
+    },
+    {
+      "category": "timber",
+      "label": "Timber",
+      "density_kg_m3": 500,
+      "factor_kgco2e_per_kg": 0.44,
+      "color": "#22c55e",
+      "keywords": ["timber", "wood", "clt", "glulam", "lvl", "holz", "lemn", "plywood", "osb"],
+      "note": "Engineered timber, biogenic carbon excluded."
+    },
+    {
+      "category": "glass",
+      "label": "Glass",
+      "density_kg_m3": 2500,
+      "factor_kgco2e_per_kg": 1.44,
+      "color": "#38bdf8",
+      "keywords": ["glass", "glazing", "glas", "sticla", "window"],
+      "note": "Flat glass, generic."
+    },
+    {
+      "category": "aluminium",
+      "label": "Aluminium",
+      "density_kg_m3": 2700,
+      "factor_kgco2e_per_kg": 6.7,
+      "color": "#e879f9",
+      "keywords": ["aluminium", "aluminum", "alu "],
+      "note": "Extruded profiles, European average."
+    },
+    {
+      "category": "insulation",
+      "label": "Insulation",
+      "density_kg_m3": 100,
+      "factor_kgco2e_per_kg": 1.28,
+      "color": "#facc15",
+      "keywords": ["insulation", "mineral wool", "rockwool", "glass wool", "eps", "xps", "pir", "izolatie"],
+      "note": "Mineral wool, generic."
+    },
+    {
+      "category": "gypsum",
+      "label": "Gypsum",
+      "density_kg_m3": 800,
+      "factor_kgco2e_per_kg": 0.39,
+      "color": "#f5f5f4",
+      "keywords": ["gypsum", "plaster", "drywall", "gips", "rigips"],
+      "note": "Plasterboard."
+    }
+  ]
+}
