@@ -21,11 +21,19 @@ def main(argv: list[str] | None = None) -> int:
     parsed = parse_ifc(args.ifc)
     print(f"{args.ifc.name}: {parsed.schema_version}, {len(parsed.elements)} elements, {parsed.parse_seconds}s")
     print(f"storeys: {', '.join(parsed.storeys) or '-'}")
+    print(f"length unit: {parsed.length_unit}")
     print(f"total embodied carbon (indicative): {parsed.carbon.total_kgco2e / 1000:.1f} tCO2e")
+    if parsed.carbon.intensity_kgco2e_m2 is not None:
+        print(
+            f"floor area: {parsed.carbon.gross_floor_area_m2:,.0f} m2 ({parsed.carbon.floor_area_source}), "
+            f"intensity {parsed.carbon.intensity_kgco2e_m2:,.0f} kgCO2e/m2"
+        )
+    if parsed.carbon.unclassified_elements:
+        print(f"unclassified: {parsed.carbon.unclassified_elements} elements (map their materials in the viewer)")
     print("by material category:")
     for bucket in parsed.carbon.by_material_category:
         print(
-            f"  {bucket.label:<14} {bucket.carbon_kgco2e / 1000:>8.1f} tCO2e  "
+            f"  {bucket.label:<20} {bucket.carbon_kgco2e / 1000:>8.1f} tCO2e  "
             f"{bucket.share_percent:>5.1f}%  ({bucket.element_count} elements)"
         )
     print(f"top {args.top} elements:")

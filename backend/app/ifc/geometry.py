@@ -31,6 +31,16 @@ class ElementMesh:
         return float(abs(np.einsum("ij,ij->i", a, np.cross(b, c)).sum()) / 6.0)
 
     @property
+    def top_area_m2(self) -> float:
+        """Plan area of the upward-facing triangles, in square metres (the top of a slab)."""
+        v = self.vertices.astype(np.float64)
+        a, b, c = v[self.faces[:, 0]], v[self.faces[:, 1]], v[self.faces[:, 2]]
+        normals = np.cross(b - a, c - a)
+        lengths = np.linalg.norm(normals, axis=1)
+        up = (lengths > 0) & (normals[:, 2] > 0.7 * lengths)
+        return float(normals[up, 2].sum() / 2.0)
+
+    @property
     def bounds(self) -> tuple[np.ndarray, np.ndarray]:
         return self.vertices.min(axis=0), self.vertices.max(axis=0)
 

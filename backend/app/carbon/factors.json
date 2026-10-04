@@ -1,5 +1,5 @@
 {
-  "_comment": "Indicative cradle-to-gate (A1-A3) embodied carbon factors. Order-of-magnitude values in the range of public generic databases such as the ICE database; they are NOT product-specific and must not be used for reporting. Replace with EPD values for real assessments. Timber excludes biogenic carbon storage.",
+  "_comment": "Indicative cradle-to-gate (A1-A3) embodied carbon factors. Order-of-magnitude values in the range of public generic databases such as the ICE database; they are NOT product-specific and must not be used for reporting. Replace with EPD values for real assessments. Timber excludes biogenic carbon storage. Keywords match whole words (digits may follow, so 'c30' matches 'C30/37'); the longest match wins and keywords starting with '~' are only used when nothing more specific matches.",
   "factors": [
     {
       "category": "concrete",
@@ -7,7 +7,19 @@
       "density_kg_m3": 2400,
       "factor_kgco2e_per_kg": 0.13,
       "color": "#94a3b8",
-      "keywords": ["concrete", "beton", "cement", "c20", "c25", "c30", "c35", "c40", "c50", "rc "],
+      "keywords": [
+        "concrete",
+        "beton",
+        "reinforced concrete",
+        "precast",
+        "c20",
+        "c25",
+        "c30",
+        "c35",
+        "c40",
+        "c50",
+        "rc"
+      ],
       "note": "Generic in-situ concrete around C30/37 with nominal reinforcement."
     },
     {
@@ -16,7 +28,23 @@
       "density_kg_m3": 7850,
       "factor_kgco2e_per_kg": 1.55,
       "color": "#f97316",
-      "keywords": ["steel", "stahl", "otel", "s235", "s275", "s355", "heb", "hea", "ipe", "rebar"],
+      "keywords": [
+        "steel",
+        "stahl",
+        "otel",
+        "oțel",
+        "s235",
+        "s275",
+        "s355",
+        "heb",
+        "hea",
+        "ipe",
+        "upn",
+        "rebar",
+        "reinforcement",
+        "galvanized",
+        "galvanised"
+      ],
       "note": "Structural sections, world-average recycled content."
     },
     {
@@ -25,7 +53,18 @@
       "density_kg_m3": 1900,
       "factor_kgco2e_per_kg": 0.21,
       "color": "#b45309",
-      "keywords": ["brick", "masonry", "clay", "block", "caramida", "ziegel"],
+      "keywords": [
+        "brick",
+        "masonry",
+        "clay",
+        "caramida",
+        "cărămidă",
+        "ziegel",
+        "bca",
+        "aac",
+        "aerated",
+        "~block"
+      ],
       "note": "Fired clay brick."
     },
     {
@@ -34,7 +73,22 @@
       "density_kg_m3": 500,
       "factor_kgco2e_per_kg": 0.44,
       "color": "#22c55e",
-      "keywords": ["timber", "wood", "clt", "glulam", "lvl", "holz", "lemn", "plywood", "osb"],
+      "keywords": [
+        "timber",
+        "wood",
+        "clt",
+        "glulam",
+        "lvl",
+        "holz",
+        "lemn",
+        "plywood",
+        "osb",
+        "softwood",
+        "hardwood",
+        "oak",
+        "pine",
+        "spruce"
+      ],
       "note": "Engineered timber, biogenic carbon excluded."
     },
     {
@@ -43,7 +97,17 @@
       "density_kg_m3": 2500,
       "factor_kgco2e_per_kg": 1.44,
       "color": "#38bdf8",
-      "keywords": ["glass", "glazing", "glas", "sticla", "window"],
+      "keywords": [
+        "glass",
+        "glazing",
+        "glas",
+        "sticla",
+        "sticlă",
+        "igu",
+        "double glazing",
+        "triple glazing",
+        "~window"
+      ],
       "note": "Flat glass, generic."
     },
     {
@@ -52,17 +116,33 @@
       "density_kg_m3": 2700,
       "factor_kgco2e_per_kg": 6.7,
       "color": "#e879f9",
-      "keywords": ["aluminium", "aluminum", "alu "],
+      "keywords": [
+        "aluminium",
+        "aluminum",
+        "alu",
+        "aluminiu"
+      ],
       "note": "Extruded profiles, European average."
     },
     {
       "category": "insulation",
-      "label": "Insulation",
+      "label": "Mineral wool",
       "density_kg_m3": 100,
       "factor_kgco2e_per_kg": 1.28,
       "color": "#facc15",
-      "keywords": ["insulation", "mineral wool", "rockwool", "glass wool", "eps", "xps", "pir", "izolatie"],
-      "note": "Mineral wool, generic."
+      "keywords": [
+        "mineral wool",
+        "rockwool",
+        "glass wool",
+        "stone wool",
+        "vata minerala",
+        "vată minerală",
+        "~insulation",
+        "~izolatie",
+        "~izolație",
+        "~dämmung"
+      ],
+      "note": "Mineral wool (stone or glass), generic. Also the fallback for materials only called \"insulation\"."
     },
     {
       "category": "gypsum",
@@ -70,8 +150,122 @@
       "density_kg_m3": 800,
       "factor_kgco2e_per_kg": 0.39,
       "color": "#f5f5f4",
-      "keywords": ["gypsum", "plaster", "drywall", "gips", "rigips"],
+      "keywords": [
+        "gypsum",
+        "plaster",
+        "drywall",
+        "gips",
+        "rigips",
+        "plasterboard",
+        "gipscarton"
+      ],
       "note": "Plasterboard."
+    },
+    {
+      "category": "foam_insulation",
+      "label": "Foam insulation",
+      "density_kg_m3": 30,
+      "factor_kgco2e_per_kg": 3.3,
+      "color": "#fde68a",
+      "keywords": [
+        "eps",
+        "xps",
+        "pir",
+        "pur",
+        "polystyrene",
+        "polystyren",
+        "polyurethane",
+        "polyisocyanurate",
+        "foam",
+        "styrofoam",
+        "polistiren"
+      ],
+      "note": "EPS/XPS/PIR boards, generic. Some XPS blowing agents push the real value much higher."
+    },
+    {
+      "category": "ceramic",
+      "label": "Ceramic tiles",
+      "density_kg_m3": 2000,
+      "factor_kgco2e_per_kg": 0.78,
+      "color": "#fb7185",
+      "keywords": [
+        "ceramic",
+        "porcelain",
+        "tile",
+        "tiles",
+        "faianta",
+        "faianță",
+        "gresie",
+        "fliesen"
+      ],
+      "note": "Ceramic and porcelain tiles."
+    },
+    {
+      "category": "plastic",
+      "label": "Plastics",
+      "density_kg_m3": 1400,
+      "factor_kgco2e_per_kg": 3.1,
+      "color": "#a78bfa",
+      "keywords": [
+        "pvc",
+        "upvc",
+        "plastic",
+        "polyethylene",
+        "hdpe",
+        "pe-hd",
+        "polypropylene",
+        "epdm",
+        "membrane"
+      ],
+      "note": "PVC and general plastics, including membranes."
+    },
+    {
+      "category": "copper",
+      "label": "Copper",
+      "density_kg_m3": 8940,
+      "factor_kgco2e_per_kg": 2.7,
+      "color": "#c2410c",
+      "keywords": [
+        "copper",
+        "cupru",
+        "kupfer"
+      ],
+      "note": "Copper sheet and pipe, European average."
+    },
+    {
+      "category": "mortar",
+      "label": "Mortar & screed",
+      "density_kg_m3": 2000,
+      "factor_kgco2e_per_kg": 0.2,
+      "color": "#d6d3d1",
+      "keywords": [
+        "mortar",
+        "screed",
+        "estrich",
+        "sapa",
+        "șapă",
+        "render",
+        "tencuiala",
+        "tencuială"
+      ],
+      "note": "Cement mortar, screed and render."
+    },
+    {
+      "category": "gravel",
+      "label": "Gravel & aggregate",
+      "density_kg_m3": 1800,
+      "factor_kgco2e_per_kg": 0.005,
+      "color": "#78716c",
+      "keywords": [
+        "gravel",
+        "aggregate",
+        "pietris",
+        "pietriș",
+        "kies",
+        "ballast",
+        "crushed stone"
+      ],
+      "note": "Unbound aggregate, e.g. roof ballast or sub-base."
     }
   ]
 }

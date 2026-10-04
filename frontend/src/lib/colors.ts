@@ -1,6 +1,6 @@
 /** Pure colour and formatting helpers shared by the 3D viewer, legend and panels. */
 
-export type ColorMode = 'material' | 'carbon' | 'class'
+export type ColorMode = 'material' | 'carbon' | 'class' | 'storey'
 
 export const UNCLASSIFIED_COLOR = '#64748b'
 export const SELECTION_COLOR = '#38bdf8'
@@ -40,6 +40,16 @@ function hashString(value: string): number {
 
 export function classColor(ifcClass: string): string {
   return CLASS_PALETTE[ifcClass] ?? FALLBACK_PALETTE[hashString(ifcClass) % FALLBACK_PALETTE.length]!
+}
+
+/** Storeys get a cool-to-warm sequence in elevation order, so the colour hints at height. */
+export const STOREY_RAMP = ['#6366f1', '#3b82f6', '#06b6d4', '#14b8a6', '#22c55e', '#84cc16', '#eab308', '#f97316']
+
+export function storeyColor(storey: string | null, storeys: string[]): string {
+  const index = storey === null ? -1 : storeys.indexOf(storey)
+  if (index < 0) return UNCLASSIFIED_COLOR
+  if (storeys.length <= 1) return STOREY_RAMP[1]!
+  return rampColor(index / (storeys.length - 1), STOREY_RAMP)
 }
 
 export function materialColor(category: string | null, factorColors: Record<string, string>): string {
@@ -87,6 +97,22 @@ export function formatCarbon(kg: number | null | undefined): string {
   if (kg === null || kg === undefined) return '–'
   if (Math.abs(kg) >= 1000) return `${(kg / 1000).toLocaleString('en', { maximumFractionDigits: 2 })} t`
   return `${kg.toLocaleString('en', { maximumFractionDigits: 0 })} kg`
+}
+
+/** kgCO2e per square metre, rounded to whole kilograms. */
+export function formatIntensity(value: number | null | undefined): string {
+  if (value === null || value === undefined) return '–'
+  return `${Math.round(value).toLocaleString('en')} kg/m²`
+}
+
+export function formatArea(m2: number | null | undefined): string {
+  if (m2 === null || m2 === undefined) return '–'
+  return `${Math.round(m2).toLocaleString('en')} m²`
+}
+
+export function formatPercent(fraction: number | null | undefined, digits = 0): string {
+  if (fraction === null || fraction === undefined) return '–'
+  return `${(fraction * 100).toFixed(digits)}%`
 }
 
 export function formatNumber(value: number | null | undefined, digits = 2, unit = ''): string {

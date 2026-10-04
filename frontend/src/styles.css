@@ -58,6 +58,79 @@ body,
   @apply border-accent-strong bg-accent-strong text-ink-950 hover:border-accent hover:bg-accent;
 }
 
+.btn-danger {
+  @apply border-bad/70 bg-bad/90 text-white hover:border-bad hover:bg-bad;
+}
+
+.icon-btn {
+  @apply h-8 w-8 justify-center p-0;
+}
+
+.tool {
+  @apply inline-flex h-8 items-center justify-center gap-1.5 rounded-lg px-2 text-xs font-medium text-ink-300 transition hover:bg-ink-700 hover:text-ink-100 disabled:opacity-40;
+}
+.tool[aria-pressed='true'] {
+  @apply bg-accent/15 text-accent;
+}
+
+.toolbar {
+  @apply flex items-center gap-0.5 rounded-xl border border-ink-700/80 bg-ink-900/85 p-1 shadow-lg backdrop-blur;
+}
+
+.section-title {
+  @apply text-[11px] font-semibold uppercase tracking-wider text-ink-300;
+}
+
+.kbd {
+  @apply inline-flex min-w-[1.4rem] items-center justify-center rounded border border-ink-600 bg-ink-900 px-1 font-mono text-[10px] text-ink-200;
+}
+
+.chip {
+  @apply inline-flex items-center gap-1.5 rounded-full border border-ink-600 bg-ink-800 px-2.5 py-1 text-[11px] font-medium text-ink-200 transition hover:border-ink-500 hover:text-ink-100;
+}
+.chip[aria-pressed='true'] {
+  @apply border-accent/60 bg-accent/15 text-accent;
+}
+
+.ui-select-trigger {
+  @apply inline-flex w-full items-center gap-2 rounded-lg border border-ink-600 bg-ink-900 font-medium outline-none transition hover:border-ink-500 focus-visible:border-accent disabled:cursor-not-allowed disabled:opacity-50;
+}
+.ui-select-trigger.is-open {
+  @apply border-accent;
+}
+
+.ui-select-menu {
+  @apply fixed z-[70] overflow-hidden rounded-xl border border-ink-600 bg-ink-800 shadow-2xl outline-none;
+}
+.ui-select-menu.absolute {
+  position: absolute;
+}
+
+.pop-enter-active,
+.pop-leave-active {
+  transition:
+    opacity 0.12s ease,
+    translate 0.12s ease;
+}
+.pop-enter-from,
+.pop-leave-to {
+  opacity: 0;
+  translate: 0 -4px;
+}
+
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.2s ease;
+}
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+}
+
+input[type='range'].slider {
+  @apply h-1.5 w-full cursor-pointer appearance-none rounded-full bg-ink-600 accent-accent;
+}
+
 .seg {
   @apply inline-flex rounded-lg border border-ink-600 bg-ink-800 p-0.5 text-xs;
 }

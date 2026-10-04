@@ -5,8 +5,11 @@ import {
   carbonColor,
   classColor,
   formatCarbon,
+  formatIntensity,
   materialColor,
   rampColor,
+  storeyColor,
+  STOREY_RAMP,
 } from './colors'
 
 describe('rampColor', () => {
@@ -57,5 +60,22 @@ describe('formatCarbon', () => {
     expect(formatCarbon(312.4)).toBe('312 kg')
     expect(formatCarbon(7490)).toBe('7.49 t')
     expect(formatCarbon(null)).toBe('–')
+  })
+})
+
+describe('storeyColor', () => {
+  it('runs from the first to the last ramp colour by elevation', () => {
+    const storeys = ['Level 0', 'Level 1', 'Level 2']
+    expect(storeyColor('Level 0', storeys)).toBe(STOREY_RAMP[0])
+    expect(storeyColor('Level 2', storeys)).toBe(STOREY_RAMP[STOREY_RAMP.length - 1])
+    expect(storeyColor(null, storeys)).toBe(UNCLASSIFIED_COLOR)
+    expect(storeyColor('Roof', storeys)).toBe(UNCLASSIFIED_COLOR)
+  })
+})
+
+describe('formatIntensity', () => {
+  it('rounds to whole kilograms per square metre', () => {
+    expect(formatIntensity(254.4)).toBe('254 kg/m²')
+    expect(formatIntensity(null)).toBe('–')
   })
 })

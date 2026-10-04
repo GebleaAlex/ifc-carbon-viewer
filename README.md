@@ -1,40 +1,83 @@
 # IFC Carbon Viewer
 
-Browse IFC/BIM models in the browser and see an indicative embodied-carbon estimate for every element.
+Open an IFC/BIM model in the browser and see where its embodied carbon is: per element, per material layer, per storey.
 
-The backend parses IFC files with [IfcOpenShell](https://ifcopenshell.org/), tessellates the geometry into a glTF binary and computes per-element carbon from material category, density and volume. The frontend renders the model with Three.js, lets you colour it by material, carbon or IFC class, filter by storey and class, and inspect any element's property and quantity sets.
+The backend parses IFC files with [IfcOpenShell](https://ifcopenshell.org/), tessellates the geometry into a glTF binary and estimates cradle-to-gate carbon from material, density and volume. Layered walls and slabs are split by layer thickness, so a brick wall with mineral wool and plaster is not counted as solid brick. The frontend renders the model with Three.js and lets you explore it: colour by material, carbon, class or storey; click a chart to isolate that part of the building; cut through it with a section plane; correct material matches and watch the numbers update.
 
-![Viewer coloured by material](docs/viewer-material.png)
+![Viewer coloured by material, with the hover tooltip on a layered wall](docs/viewer-material.png)
 
-![Viewer coloured by embodied carbon with the ground-floor slab selected](docs/viewer-carbon-selection.png)
+<table>
+  <tr>
+    <td width="50%"><img src="docs/viewer-carbon-selection.png" alt="Viewer coloured by embodied carbon with a layered wall selected and its four materials listed" /></td>
+    <td width="50%"><img src="docs/viewer-section-materials.png" alt="Section cut through the top storey showing the steel frame, with the Materials tab open" /></td>
+  </tr>
+  <tr>
+    <td>Carbon colouring, with a layered wall selected</td>
+    <td>Section cut and the material mapping panel</td>
+  </tr>
+</table>
 
 ## What it does
 
-- **Parses IFC2X3 / IFC4 / IFC4X3** with IfcOpenShell: spatial tree, storeys, element types, materials, property sets and base quantities.
-- **Exports geometry as GLB** using a small dependency-free glTF writer. One node per element (named by GlobalId) so the viewer can pick and recolour elements individually. Flat per-face normals and a Z-up to Y-up conversion are handled server-side.
-- **Estimates embodied carbon (A1–A3)** per element: `volume × density × factor`. Volume comes from `Qto_*BaseQuantities` when the model has them and from the tessellated mesh (signed tetrahedron volume) when it does not. Every element records which source was used.
-- **Classifies materials** by keyword against an editable factor table ([`backend/app/carbon/factors.json`](backend/app/carbon/factors.json)). Elements that cannot be classified are reported as such instead of silently receiving a default factor.
-- **Interactive viewer**: orbit/pan/zoom, hover tooltips, click to select, colour modes, storey and class filters, fit-to-view, breakdowns by material, storey and class, and a "largest contributors" list.
-- **Drag-and-drop upload** of your own IFC files. Parsing runs in the background and the UI polls until the model is ready.
-- **Self-contained sample**: a two-storey building is generated with `ifcopenshell.api` (walls, slabs, columns, a curtain wall and a roof, with materials and quantities), so the repository ships no third-party IFC.
+**Parsing**
+
+- Reads **IFC2X3, IFC4 and IFC4X3** with IfcOpenShell: spatial tree, storeys, types, materials, property sets and base quantities.
+- Handles **units properly**. Lengths, areas and volumes each get their own scale, so the usual Revit/ArchiCAD export (millimetre lengths, cubic-metre volumes) gives the right volumes.
+- Reads **material layer sets, constituent sets, profile sets and material lists**. Each element keeps its layers with thickness and volume share.
+- Treats **assemblies** (curtain walls, stairs, roofs) as containers. Their carbon is counted once, through their parts.
+- Finds the **floor area** from `IfcSpace` quantities, falling back to floor-slab areas or the measured top faces of slabs, and reports **kgCO₂e/m²**.
+- Exports geometry as **GLB** with a small dependency-free glTF writer: one node per element, named by GlobalId.
+
+**Estimating**
+
+- `volume × density × factor` per layer, cradle to gate (A1–A3). Volume comes from `Qto_*BaseQuantities` when present and from the tessellated mesh otherwise. Every element records which source was used.
+- Materials are matched by keyword against an editable table ([`factors.json`](backend/app/carbon/factors.json)) with 14 categories, from concrete and steel to foam insulation, membranes and gravel.
+  - A keyword only matches as a whole word, so "pipe" is not read as an IPE steel section.
+  - The most specific keyword wins, so "glass wool" is insulation, not glass.
+  - English, Romanian and German names are covered.
+- Anything that cannot be classified is reported, not guessed. The **Materials** tab lets you assign a category per material. The mapping is stored per model and the estimate is recomputed on the server without parsing the IFC again.
+
+**Viewer**
+
+- Colour by material, carbon (square-root scale), IFC class or storey. Glass is drawn see-through in the material view.
+- **Focus**: click a material in the donut chart or legend, a storey, a class or a data-quality issue. Everything else fades to a faint outline.
+- **Section cut** with a height slider, **X-ray**, **isolate / hide** the selection, show or hide storeys and classes.
+- Camera presets (iso, top, front, side), animated fit, soft shadows and edge lines.
+- Selection panel with the layer breakdown, the calculation for each layer, parent/part navigation and every property set.
+- Element list with search, sorting and paging for large models.
+- **Exports**: element table as CSV (one row per layer, adds up to the total), JSON report, PNG screenshot.
+- Deep links (`?model=…&element=…&color=carbon`), keyboard shortcuts (`?` lists them), drag-and-drop upload with progress, and a layout that works on phones.
+
+**Sample**
+
+A three-storey office is generated with `ifcopenshell.api` ([`make_sample.py`](backend/scripts/make_sample.py)), so the repository ships no third-party IFC. It uses millimetre lengths like a real export and contains:
+
+- layered walls and slabs with windows in real openings;
+- windows and a door with constituent sets;
+- HEB/IPE steel profiles with no volume quantities, so their volume comes from the geometry;
+- a curtain wall, a stair and a roof built as assemblies;
+- spaces with floor areas;
+- one material the factor table does not know.
 
 ## Architecture
 
 ```mermaid
 flowchart LR
   subgraph browser [Browser · Vue 3 + Three.js]
-    UI[Panels & toolbar] --> Store[Pinia store]
-    Store --> Viewer[Three.js viewer\nGLTFLoader · raycasting]
+    UI[Panels, charts, toolbar] --> Store[Pinia store]
+    Store --> Viewer[Three.js viewer\npicking · ghosting · clipping]
   end
   subgraph api [FastAPI]
-    Upload[POST /api/models] --> Store2[(File-backed model store)]
-    Store2 --> Parse[parse_ifc]
+    Upload[POST /api/models] --> Files[(File-backed model store)]
+    Files --> Parse[parse_ifc\nunits · layers · assemblies · floor area]
     Parse --> Geo[tessellate → GLB]
-    Parse --> Carbon[classify → estimate → summarize]
-    Elements[GET /elements, /carbon, /geometry.glb]
+    Parse --> Carbon[classify → estimate per layer → summarize]
+    Mapping[PUT /mapping] --> Carbon
+    Read[GET /elements, /carbon, /materials, /geometry.glb, /export.csv]
   end
-  Store <--> Elements
-  Viewer -->|GLB| Elements
+  Store <--> Read
+  Store --> Mapping
+  Viewer -->|GLB| Read
 ```
 
 | Layer | Stack |
@@ -49,10 +92,14 @@ flowchart LR
 | --- | --- | --- |
 | `GET` | `/api/models` | List models with status and summary |
 | `POST` | `/api/models` | Upload an `.ifc` (multipart). Returns `202` and parses in the background |
-| `GET` | `/api/models/{id}` | Status, element counts, storeys, total carbon |
-| `GET` | `/api/models/{id}/elements` | Element summaries; filter by `storey`, `ifc_class`, `material_category` |
-| `GET` | `/api/models/{id}/elements/{global_id}` | Full detail with property and quantity sets |
-| `GET` | `/api/models/{id}/carbon` | Breakdown by material, storey and class, plus top emitters |
+| `GET` | `/api/models/{id}` | Status, counts, storeys, units, total carbon, floor area and intensity |
+| `GET` | `/api/models/{id}/elements` | Element summaries with layers; filter by `storey`, `ifc_class`, `material_category` |
+| `GET` | `/api/models/{id}/elements/{global_id}` | Full detail with parent/parts, property and quantity sets |
+| `GET` | `/api/models/{id}/carbon` | Totals, data-quality counts, breakdowns and top emitters |
+| `GET` | `/api/models/{id}/materials` | Every material name with its automatic and effective category |
+| `GET` `PUT` | `/api/models/{id}/mapping` | Read or replace the per-model material overrides; `PUT` recomputes the estimate |
+| `GET` | `/api/models/{id}/export.csv` | One row per element and material layer |
+| `GET` | `/api/models/{id}/report.json` | Model summary, carbon breakdowns and materials |
 | `GET` | `/api/models/{id}/geometry.glb` | Tessellated geometry as glTF binary |
 | `GET` | `/api/carbon/factors` | The factor table in use |
 | `DELETE` | `/api/models/{id}` | Remove a model and its artefacts |
@@ -78,7 +125,7 @@ npm install
 npm run dev
 ```
 
-Open `http://localhost:5173`. The sample model is loaded on first start; drop any `.ifc` file on the page to parse your own.
+Open `http://localhost:5173`. The sample model is loaded on first start; drop any `.ifc` file on the page to parse your own. Models parsed by v0.1 are parsed again automatically on the first start of v0.2.
 
 Or with Docker:
 
@@ -98,22 +145,26 @@ uv run python -m app.cli samples/sample-building.ifc --glb out.glb
 ```
 
 ```
-sample-building.ifc: IFC4, 19 elements, 0.03s
-storeys: Level 0, Level 1
-total embodied carbon (indicative): 55.3 tCO2e
+sample-building.ifc: IFC4, 149 elements, 0.82s
+storeys: Level 0, Level 1, Level 2
+length unit: mm
+total embodied carbon (indicative): 255.9 tCO2e
+floor area: 1,008 m2 (spaces), intensity 254 kgCO2e/m2
+unclassified: 3 elements (map their materials in the viewer)
 by material category:
-  Masonry            24.0 tCO2e   43.4%  (7 elements)
-  Timber             10.6 tCO2e   19.1%  (2 elements)
-  Concrete            7.5 tCO2e   13.5%  (1 elements)
-  Steel               6.9 tCO2e   12.5%  (8 elements)
-  Glass               6.4 tCO2e   11.5%  (1 elements)
+  Concrete                 91.2 tCO2e   35.6%  (14 elements)
+  Aluminium                33.7 tCO2e   13.2%  (74 elements)
+  Timber                   29.6 tCO2e   11.6%  (3 elements)
+  Masonry                  21.0 tCO2e    8.2%  (11 elements)
+  Steel                    20.8 tCO2e    8.1%  (23 elements)
+  ...
 ```
 
 ## Tests
 
 ```bash
-cd backend && uv run pytest          # parser, GLB writer, carbon maths, API round trip
-cd frontend && npm test              # colour scale and formatting helpers
+cd backend && uv run pytest          # units, layers, assemblies, classification, mapping, exports, API round trip
+cd frontend && npm test              # colour scales, formatting, focus matching, storey stacks
 cd frontend && npm run typecheck     # vue-tsc, strict
 ```
 
@@ -128,7 +179,7 @@ The factors are generic, order-of-magnitude cradle-to-gate values in the range p
 - account for reinforcement in concrete and biogenic carbon in timber explicitly,
 - validate quantities against the model's quantity take-off rather than trusting either source blindly.
 
-The code is structured so that swapping the factor table or the classification rule is a one-file change.
+Swapping the factor table or the classification rule is a one-file change, and the per-model mapping covers the cases a keyword cannot.
 
 ## Configuration
 
@@ -143,10 +194,13 @@ The code is structured so that swapping the factor table or the classification r
 
 ## Limitations and ideas
 
-- Parsing is synchronous inside a background task; a large model blocks one worker. A queue (Celery, arq) would be the next step for production use.
-- One colour per element: elements with several material layers get the colour of the dominant layer. Per-face colours would need a second material channel in the GLB.
-- Property sets are stored as JSON per model; a database would make cross-model queries possible.
-- Possible extensions: material layer thicknesses from `IfcMaterialLayerSet`, per-storey floor-area intensities (kgCO₂e/m²), export of the element table to CSV/XLSX, IFC diffing between design options.
+- Parsing runs in a background task inside the API process; a very large model occupies one worker while it parses. A queue (Celery, arq) would be the next step for production use.
+- One colour per element: layered elements show their main material. The layer split is in the selection panel and the exports.
+- A section cut shows the inside of walls hollow; drawing caps would need stencil-based capping.
+- Windows and doors without volume quantities rely on their geometry, which depends on how detailed the authoring tool made them.
+- Possible extensions: life-cycle stages beyond A1–A3, EPD import, comparing two design options of the same building, BCF issues for unclassified elements.
+
+See [CHANGELOG.md](CHANGELOG.md) for what changed between versions.
 
 ## License
 
