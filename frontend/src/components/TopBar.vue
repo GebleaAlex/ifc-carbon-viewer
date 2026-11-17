@@ -28,6 +28,19 @@ const modelOptions = computed<SelectOption<string>[]>(() =>
   })),
 )
 
+const failedCount = computed(() => store.models.filter((m) => m.status === 'failed').length)
+
+async function onRemoveFailed() {
+  const count = failedCount.value
+  const ok = await confirmDialog({
+    title: count === 1 ? 'Remove the failed upload?' : `Remove ${count} failed uploads?`,
+    message: 'Files that could not be parsed are deleted from the server. Models that loaded fine are not touched.',
+    confirm: 'Remove',
+    danger: true,
+  })
+  if (ok) await store.removeFailedModels()
+}
+
 function onFileChosen(event: Event) {
   const file = (event.target as HTMLInputElement).files?.[0]
   if (file) store.upload(file)
@@ -88,18 +101,20 @@ async function onDelete() {
 </script>
 
 <template>
-  <header class="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-ink-700/80 bg-ink-900/70 px-4 py-2.5 backdrop-blur">
-    <div class="flex items-center gap-2.5">
-      <img src="/favicon.svg" alt="" class="h-8 w-8" />
-      <div class="leading-tight">
-        <div class="text-sm font-semibold tracking-tight">IFC Carbon Viewer</div>
-        <div class="text-[11px] text-ink-300">Embodied carbon for BIM models</div>
+  <header class="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-ink-700/80 bg-ink-900/70 px-3 py-2.5 backdrop-blur sm:px-4">
+    <div class="flex min-w-0 items-center gap-2.5">
+      <img src="/favicon.svg" alt="" class="h-8 w-8 shrink-0" />
+      <div class="min-w-0 leading-tight">
+        <h1 class="truncate text-sm font-semibold tracking-tight">IFC Carbon Viewer</h1>
+        <div class="hidden text-[11px] text-ink-300 sm:block">Embodied carbon for BIM models</div>
       </div>
     </div>
 
     <div class="mx-1 hidden h-7 w-px bg-ink-700 sm:block" />
 
-    <div class="w-[min(320px,60vw)]">
+    <!-- On phones the model picker drops to its own full-width row, under the logo and the actions. -->
+    <div class="order-last flex w-full items-center gap-2 sm:order-none sm:w-auto">
+      <div class="min-w-0 flex-1 sm:w-[min(320px,40vw)] sm:flex-none">
       <UiSelect
         :model-value="store.currentId"
         :options="modelOptions"
@@ -109,6 +124,15 @@ async function onDelete() {
         :min-width="340"
         @change="(id) => store.selectModel(id)"
       />
+      </div>
+      <button
+        v-if="failedCount"
+        class="chip shrink-0 border-bad/40 text-bad hover:border-bad/70 hover:text-bad"
+        title="Remove the uploads that could not be parsed"
+        @click="onRemoveFailed"
+      >
+        <Icon name="trash" :size="13" /> {{ failedCount }} failed
+      </button>
     </div>
 
     <div v-if="store.currentModel" class="hidden items-center gap-1.5 text-[11px] text-ink-300 xl:flex">
@@ -132,7 +156,7 @@ async function onDelete() {
       <button class="btn icon-btn hidden sm:inline-flex" title="Keyboard shortcuts (?)" aria-label="Keyboard shortcuts" @click="emit('help')">
         <Icon name="keyboard" />
       </button>
-      <MenuButton label="Export" icon="download" :items="exportItems" />
+      <MenuButton label="Export" icon="download" :items="exportItems" compact />
       <button
         v-if="store.currentModel && !store.currentModel.is_sample"
         class="btn icon-btn"
@@ -148,9 +172,13 @@ async function onDelete() {
           <path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" stroke-width="3" stroke-linecap="round" />
         </svg>
         <Icon v-else name="upload" />
-        {{ store.uploading ? (store.uploadProgress !== null ? `Uploading ${Math.round(store.uploadProgress * 100)}%` : 'Parsing…') : 'Open IFC' }}
+        <template v-if="!store.uploading">Open IFC</template>
+        <template v-else-if="store.uploadProgress !== null">
+          <span class="hidden sm:inline">Uploading</span> {{ Math.round(store.uploadProgress * 100) }}%
+        </template>
+        <template v-else>Parsing…</template>
       </button>
-      <input ref="fileInput" type="file" accept=".ifc" class="hidden" @change="onFileChosen" />
+      <input ref="fileInput" type="file" accept=".ifc" class="hidden" aria-label="IFC file" @change="onFileChosen" />
     </div>
   </header>
 </template>

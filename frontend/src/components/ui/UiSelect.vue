@@ -40,7 +40,8 @@ const filtered = computed(() => {
 function place() {
   const rect = trigger.value?.getBoundingClientRect()
   if (!rect) return
-  const width = Math.max(rect.width, props.minWidth)
+  // Never wider than the screen: a 340px menu on a 320px phone would hang off the edge.
+  const width = Math.min(Math.max(rect.width, props.minWidth), window.innerWidth - 16)
   const spaceBelow = window.innerHeight - rect.bottom
   const up = spaceBelow < 280 && rect.top > spaceBelow
   const left = Math.min(rect.left, window.innerWidth - width - 8)
@@ -76,6 +77,8 @@ function scrollActiveIntoView() {
 
 function onKey(event: KeyboardEvent) {
   if (event.key === 'Escape') {
+    // Closing the menu is all Escape should do here; the page-level shortcut would also clear the selection.
+    event.stopPropagation()
     open.value = false
     trigger.value?.focus()
   } else if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {

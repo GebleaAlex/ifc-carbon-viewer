@@ -111,7 +111,9 @@ class ModelStore:
 
     def process(self, model_id: str) -> None:
         """Parse the stored IFC and persist the derived artefacts. Safe to run in a worker thread."""
-        meta = self._models[model_id]
+        meta = self._models.get(model_id)
+        if meta is None:  # deleted before the background task got to it
+            return
         target_dir = self._dir(model_id)
         try:
             parsed = parse_ifc(target_dir / "model.ifc")
@@ -150,6 +152,10 @@ class ModelStore:
             meta = meta.model_copy(update={"status": "failed", "error": f"{type(exc).__name__}: {exc}"})
         with self._lock:
             self._cache.pop(model_id, None)
+            if model_id not in self._models:
+                # Deleted while it was being parsed: do not bring it back, and clear what was written meanwhile.
+                shutil.rmtree(target_dir, ignore_errors=True)
+                return
             self._models[model_id] = meta
             self._write_meta(meta)
 

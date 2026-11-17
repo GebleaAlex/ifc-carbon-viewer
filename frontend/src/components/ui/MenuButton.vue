@@ -5,7 +5,8 @@ import type { MenuItem } from './types'
 
 // A button that opens a short list of actions (Export, More). Items are plain objects so callers stay declarative.
 
-const props = defineProps<{ label: string; icon?: string; items: MenuItem[]; iconOnly?: boolean }>()
+// `compact` drops the label on phones, where the header has no room for it.
+const props = defineProps<{ label: string; icon?: string; items: MenuItem[]; iconOnly?: boolean; compact?: boolean }>()
 const open = ref(false)
 const root = ref<HTMLDivElement | null>(null)
 
@@ -13,6 +14,12 @@ function run(item: MenuItem) {
   if (item.disabled) return
   open.value = false
   item.action()
+}
+
+function onEscape(event: KeyboardEvent) {
+  if (!open.value) return
+  event.stopPropagation()
+  open.value = false
 }
 
 function onOutside(event: PointerEvent) {
@@ -27,7 +34,7 @@ onBeforeUnmount(() => window.removeEventListener('pointerdown', onOutside, true)
 </script>
 
 <template>
-  <div ref="root" class="relative" @keydown.esc="open = false">
+  <div ref="root" class="relative" @keydown.esc="onEscape">
     <button
       class="btn"
       :class="{ 'icon-btn': props.iconOnly }"
@@ -38,11 +45,11 @@ onBeforeUnmount(() => window.removeEventListener('pointerdown', onOutside, true)
       @click="open = !open"
     >
       <Icon v-if="props.icon" :name="props.icon" />
-      <span v-if="!props.iconOnly">{{ props.label }}</span>
-      <Icon v-if="!props.iconOnly" name="chevron" :size="14" class="text-ink-300" />
+      <span v-if="!props.iconOnly" :class="{ 'hidden sm:inline': props.compact }">{{ props.label }}</span>
+      <Icon v-if="!props.iconOnly" name="chevron" :size="14" class="text-ink-300" :class="{ 'hidden sm:block': props.compact }" />
     </button>
     <Transition name="pop">
-      <div v-if="open" class="ui-select-menu absolute right-0 top-full mt-1.5 w-64 p-1" role="menu">
+      <div v-if="open" class="ui-select-menu absolute right-0 top-full mt-1.5 w-64 max-w-[calc(100vw-1.5rem)] p-1" role="menu">
         <button
           v-for="item in props.items"
           :key="item.label"

@@ -60,6 +60,8 @@ const issues = computed(() => {
   return list.filter((i) => i.count > 0)
 })
 
+const isIssueActive = (key: QualityIssue) => store.focus?.kind === 'quality' && store.focus.key === key
+
 const floorAreaNote = computed(() => {
   const source = carbon.value?.floor_area_source
   if (source === 'spaces') return 'from IfcSpace floor areas'
@@ -108,8 +110,9 @@ const floorAreaNote = computed(() => {
         <button
           v-for="issue in issues"
           :key="issue.key"
-          class="chip border-warn/40 text-warn"
-          :aria-pressed="store.focus?.kind === 'quality' && store.focus.key === issue.key"
+          class="chip"
+          :class="{ 'border-warn/40 text-warn': !isIssueActive(issue.key) }"
+          :aria-pressed="isIssueActive(issue.key)"
           :title="issue.hint"
           @click="store.toggleFocus({ kind: 'quality', key: issue.key, label: `${issue.count} ${issue.label}` })"
         >

@@ -146,3 +146,26 @@ def test_models_from_older_versions_are_parsed_again(tmp_path, sample_path):
 
 def test_unknown_model_is_404(client):
     assert client.get("/api/models/nope/elements").status_code == 404
+
+
+def test_model_deleted_while_parsing_stays_deleted(tmp_path, sample_path, monkeypatch):
+    import app.store as store_module
+
+    data = tmp_path / "data"
+    store = ModelStore(data)
+    meta = store.register(sample_path, sample_path.name)
+    real_parse = store_module.parse_ifc
+
+    def parse_then_delete(path):
+        parsed = real_parse(path)
+        store.delete(meta.id)  # the user removes the model while the worker is still busy
+        return parsed
+
+    monkeypatch.setattr(store_module, "parse_ifc", parse_then_delete)
+    store.process(meta.id)
+    assert store.get(meta.id) is None
+    assert not (data / meta.id).exists()
+    assert ModelStore(data).list() == []
+
+    store.process(meta.id)  # a task that starts after the delete is a no-op, not a KeyError
+    assert store.get(meta.id) is None

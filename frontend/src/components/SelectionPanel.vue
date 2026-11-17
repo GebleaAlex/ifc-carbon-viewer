@@ -30,8 +30,14 @@ function display(value: unknown): string {
 }
 
 async function copyLink() {
-  await navigator.clipboard?.writeText(window.location.href)
-  store.notice = 'Link to this element copied'
+  // The clipboard API only exists on https and localhost, and the browser may still refuse.
+  try {
+    if (!navigator.clipboard) throw new Error('no clipboard')
+    await navigator.clipboard.writeText(window.location.href)
+    store.notice = 'Link to this element copied'
+  } catch {
+    store.error = 'Could not copy the link. Copy it from the address bar instead.'
+  }
 }
 </script>
 

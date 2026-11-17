@@ -28,6 +28,7 @@ interface Entry {
 
 const HOVER_EMISSIVE = new THREE.Color('#38bdf8')
 const BLACK = new THREE.Color(0x000000)
+const SELECTION = new THREE.Color(SELECTION_COLOR)
 const GHOST_OPACITY = 0.07
 const EDGE_OPACITY = 0.45
 const EDGE_LIMIT = 4000 // above this many meshes, skip edge overlays and shadows to keep the frame rate up
@@ -60,6 +61,9 @@ export class Viewer {
   private pointerDownAt = { x: 0, y: 0 }
   private tween: { from: THREE.Vector3; to: THREE.Vector3; fromTarget: THREE.Vector3; toTarget: THREE.Vector3; start: number } | null = null
   private disposed = false
+  /** Frames are only drawn when something changed, so an idle view costs no GPU time. */
+  private needsRender = true
+  private loadToken = 0
   /** True until the user moves the camera: while it holds, resizes re-frame the model. */
   private autoFit = true
 
@@ -100,6 +104,7 @@ export class Viewer {
       this.tween = null
       this.autoFit = false
     })
+    this.controls.addEventListener('change', this.invalidate)
 
     const hemisphere = new THREE.HemisphereLight(0xffffff, 0x334155, 0.9)
     this.keyLight = new THREE.DirectionalLight(0xfff7ed, 1.9)
@@ -120,6 +125,8 @@ export class Viewer {
     canvas.addEventListener('pointerdown', this.onPointerDown)
     canvas.addEventListener('pointerup', this.onPointerUp)
     canvas.addEventListener('pointerleave', this.onPointerLeave)
+    canvas.addEventListener('pointercancel', this.onPointerLeave)
+    canvas.addEventListener('dblclick', this.onDoubleClick)
 
     this.renderer.setAnimationLoop(this.frame)
   }
@@ -128,8 +135,10 @@ export class Viewer {
 
   async load(url: string): Promise<{ meshCount: number }> {
     this.clear()
+    const token = ++this.loadToken
     const gltf = await new GLTFLoader().loadAsync(url)
-    if (this.disposed) return { meshCount: 0 }
+    // A newer load (or clear) started while this file was downloading: drop it, or two models end up on screen.
+    if (this.disposed || token !== this.loadToken) return { meshCount: 0 }
     const meshes: THREE.Mesh[] = []
     gltf.scene.traverse((object) => {
       if ((object as THREE.Mesh).isMesh) meshes.push(object as THREE.Mesh)
@@ -190,10 +199,12 @@ export class Viewer {
     this.addGroundAndGrid()
     this.fitShadowCamera()
     this.fitToView(undefined, false)
+    this.invalidate()
     return { meshCount: meshes.length }
   }
 
   clear(): void {
+    this.loadToken++
     for (const entry of this.entries.values()) {
       entry.mesh.geometry.dispose()
       entry.material.dispose()
@@ -216,6 +227,8 @@ export class Viewer {
     this.bounds.makeEmpty()
     this.selectedId = null
     this.hoveredId = null
+    this.sectionPlanes.length = 0
+    this.invalidate()
   }
 
   // -- appearance ------------------------------------------------------------------------
@@ -240,6 +253,7 @@ export class Viewer {
       entry.mesh.visible = visible
       if (entry.edges) entry.edges.visible = visible
     }
+    this.invalidate()
     if (this.hoveredId && !this.entries.get(this.hoveredId)?.mesh.visible) this.setHovered(null)
   }
 
@@ -261,6 +275,7 @@ export class Viewer {
 
   /** Cut the model horizontally. `height` runs from 0 (bottom of the model) to 1 (top). */
   setSection(enabled: boolean, height: number): void {
+    const planesBefore = this.sectionPlanes.length
     this.sectionPlanes.length = 0
     if (enabled && !this.bounds.isEmpty()) {
       const y = THREE.MathUtils.lerp(this.bounds.min.y, this.bounds.max.y, THREE.MathUtils.clamp(height, 0, 1))
@@ -270,11 +285,20 @@ export class Viewer {
     } else if (this.sectionHelper) {
       this.sectionHelper.visible = false
     }
-    // Materials share the array, but three.js only rebuilds programs when the plane count changes.
+    this.invalidate()
+    // Materials share the plane array, so moving the plane needs nothing more. Only switching the
+    // cut on or off changes the plane count, and that is when the programs have to be rebuilt.
+    if (this.sectionPlanes.length === planesBefore) return
     for (const entry of this.entries.values()) {
       entry.material.needsUpdate = true
       if (entry.edges) (entry.edges.material as THREE.Material).needsUpdate = true
     }
+  }
+
+  /** Highlight an element from outside the 3D view, e.g. while its row in a list is hovered. */
+  setHighlighted(globalId: string | null): void {
+    const entry = globalId ? this.entries.get(globalId) : null
+    this.setHovered(entry && entry.mesh.visible ? globalId : null)
   }
 
   private setHovered(globalId: string | null): void {
@@ -299,7 +323,7 @@ export class Viewer {
     const transparent = opacity < 0.999
 
     if (isSelected) {
-      material.color.copy(entry.displayColor).lerp(new THREE.Color(SELECTION_COLOR), 0.55)
+      material.color.copy(entry.displayColor).lerp(SELECTION, 0.55)
       material.emissive.set(SELECTION_COLOR)
       material.emissiveIntensity = 0.45
     } else {
@@ -318,6 +342,7 @@ export class Viewer {
       edgeMaterial.opacity = ghost ? 0.06 : EDGE_OPACITY
       edgeMaterial.color.set(isSelected ? 0x0c4a6e : 0x0b1220)
     }
+    this.invalidate()
   }
 
   // -- camera -------------------------------------------------------------------------------
@@ -364,6 +389,7 @@ export class Viewer {
       this.camera.position.copy(position)
       this.controls.target.copy(center)
       this.controls.update()
+      this.invalidate()
       return
     }
     this.tween = {
@@ -375,10 +401,26 @@ export class Viewer {
     }
   }
 
-  /** Render one frame and return it as a PNG data URL. */
+  /**
+   * Render one frame and return it as a PNG data URL. The WebGL canvas is transparent (the
+   * backdrop is CSS), so the frame is composited onto a matching gradient instead of exporting
+   * a see-through image that turns white or black in other programs.
+   */
   screenshot(): string {
     this.renderer.render(this.scene, this.camera)
-    return this.renderer.domElement.toDataURL('image/png')
+    const source = this.renderer.domElement
+    const canvas = document.createElement('canvas')
+    canvas.width = source.width
+    canvas.height = source.height
+    const context = canvas.getContext('2d')
+    if (!context) return source.toDataURL('image/png')
+    const gradient = context.createLinearGradient(0, 0, 0, canvas.height)
+    gradient.addColorStop(0, '#0d1626')
+    gradient.addColorStop(1, '#070b14')
+    context.fillStyle = gradient
+    context.fillRect(0, 0, canvas.width, canvas.height)
+    context.drawImage(source, 0, 0)
+    return canvas.toDataURL('image/png')
   }
 
   private addGroundAndGrid(): void {
@@ -443,6 +485,10 @@ export class Viewer {
     this.sectionHelper.visible = true
   }
 
+  private invalidate = (): void => {
+    this.needsRender = true
+  }
+
   // -- interaction -----------------------------------------------------------------------------
 
   private lastPointer = { clientX: 0, clientY: 0 }
@@ -455,6 +501,9 @@ export class Viewer {
   }
 
   private onPointerMove = (event: PointerEvent): void => {
+    // Hovering is a mouse thing: a finger has no hover, and while a button is held the camera
+    // is being dragged, where picking every frame only costs time and makes the model flicker.
+    if (event.pointerType === 'touch' || event.buttons !== 0) return
     this.updatePointer(event)
     this.pointerDirty = true
   }
@@ -472,8 +521,17 @@ export class Viewer {
     this.callbacks.onSelect?.({ globalId: hit, clientX: event.clientX, clientY: event.clientY })
   }
 
+  /** Double-click zooms to the element under the pointer, or back to the whole model on empty space. */
+  private onDoubleClick = (event: MouseEvent): void => {
+    const rect = this.renderer.domElement.getBoundingClientRect()
+    this.pointer.set(((event.clientX - rect.left) / rect.width) * 2 - 1, -((event.clientY - rect.top) / rect.height) * 2 + 1)
+    const hit = this.pick()
+    this.fitToView(hit ? [hit] : undefined)
+  }
+
   private onPointerLeave = (): void => {
     this.pointer.set(2, 2)
+    this.pointerDirty = false
     this.setHovered(null)
     this.callbacks.onHover?.({ globalId: null, clientX: 0, clientY: 0 })
   }
@@ -495,6 +553,7 @@ export class Viewer {
       this.camera.position.lerpVectors(this.tween.from, this.tween.to, k)
       this.controls.target.lerpVectors(this.tween.fromTarget, this.tween.toTarget, k)
       if (t >= 1) this.tween = null
+      this.needsRender = true
     }
     if (this.pointerDirty) {
       this.pointerDirty = false
@@ -504,7 +563,10 @@ export class Viewer {
         this.callbacks.onHover?.({ globalId: hit, ...this.lastPointer })
       }
     }
-    this.controls.update()
+    // With damping the controls keep moving for a few frames after the pointer is released.
+    if (this.controls.update()) this.needsRender = true
+    if (!this.needsRender) return
+    this.needsRender = false
     this.renderer.render(this.scene, this.camera)
   }
 
@@ -514,6 +576,7 @@ export class Viewer {
     this.renderer.setSize(clientWidth, clientHeight, false)
     this.camera.aspect = clientWidth / clientHeight
     this.camera.updateProjectionMatrix()
+    this.invalidate()
     if (this.autoFit && !this.bounds.isEmpty()) this.fitToView(undefined, false)
   }
 
@@ -526,6 +589,8 @@ export class Viewer {
     canvas.removeEventListener('pointerdown', this.onPointerDown)
     canvas.removeEventListener('pointerup', this.onPointerUp)
     canvas.removeEventListener('pointerleave', this.onPointerLeave)
+    canvas.removeEventListener('pointercancel', this.onPointerLeave)
+    canvas.removeEventListener('dblclick', this.onDoubleClick)
     this.clear()
     this.scene.environment?.dispose()
     this.controls.dispose()

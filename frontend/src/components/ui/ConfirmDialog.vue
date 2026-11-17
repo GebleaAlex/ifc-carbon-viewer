@@ -20,7 +20,7 @@ watch(
         v-if="confirmState"
         class="fixed inset-0 z-[60] flex items-center justify-center bg-ink-950/70 p-4 backdrop-blur-sm"
         @click.self="resolveConfirm(false)"
-        @keydown.esc="resolveConfirm(false)"
+        @keydown.esc.stop="resolveConfirm(false)"
       >
         <div class="panel w-full max-w-sm p-5 shadow-2xl" role="alertdialog" aria-modal="true" :aria-label="confirmState.title">
           <h2 class="text-base font-semibold">{{ confirmState.title }}</h2>

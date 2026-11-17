@@ -61,7 +61,7 @@ async function resetAll() {
 
     <div class="flex items-center gap-2 rounded-lg border border-ink-600 bg-ink-900 px-2.5 focus-within:border-accent">
       <Icon name="search" :size="14" class="text-ink-300" />
-      <input v-model="query" type="search" placeholder="Search materials…" class="h-8 w-full bg-transparent text-sm outline-none placeholder:text-ink-500" />
+      <input v-model="query" type="search" placeholder="Search materials…" aria-label="Search materials" class="h-8 w-full bg-transparent text-sm outline-none placeholder:text-ink-500" />
     </div>
 
     <ul class="space-y-2">
@@ -107,6 +107,9 @@ async function resetAll() {
             <Icon name="reset" :size="14" />
           </button>
         </div>
+      </li>
+      <li v-if="!rows.length" class="rounded-lg border border-ink-700 px-3 py-6 text-center text-xs text-ink-300">
+        {{ store.materials.length ? 'No materials match.' : 'This model has no materials assigned.' }}
       </li>
     </ul>
   </div>

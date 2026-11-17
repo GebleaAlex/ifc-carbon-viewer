@@ -17,6 +17,9 @@ export type PanelTab = 'overview' | 'elements' | 'materials' | 'selection'
 const COLOR_MODES: ColorMode[] = ['material', 'carbon', 'class', 'storey']
 
 export const useViewerStore = defineStore('viewer', () => {
+  let modelRequest = 0
+  let polling = false
+
   // -- server data ----------------------------------------------------------------------
   const models = ref<ModelSummary[]>([])
   const factors = ref<MaterialFactor[]>([])
@@ -39,7 +42,10 @@ export const useViewerStore = defineStore('viewer', () => {
   const selectedId = ref<string | null>(null)
   const hoveredId = ref<string | null>(null)
   const activeTab = ref<PanelTab>('overview')
+  const panelCollapsed = ref(false)
   const loading = ref(false)
+  /** The first request failed: the API is unreachable, so the page offers a retry instead of an empty viewer. */
+  const offline = ref(false)
   const uploading = ref(false)
   const uploadProgress = ref<number | null>(null)
   const uploadName = ref<string | null>(null)
@@ -124,11 +130,18 @@ export const useViewerStore = defineStore('viewer', () => {
     window.history.replaceState(null, '', url)
   }
   watch(colorMode, syncUrl)
+  watch(
+    () => currentModel.value?.name,
+    (name) => (document.title = name ? `${name} · IFC Carbon Viewer` : 'IFC Carbon Viewer'),
+  )
 
   // -- actions --------------------------------------------------------------------------
   async function init(): Promise<void> {
+    loading.value = true
     try {
       const [modelList, factorList] = await Promise.all([api.listModels(), api.getFactors()])
+      offline.value = false
+      error.value = null
       models.value = modelList
       factors.value = factorList
       const params = new URLSearchParams(window.location.search)
@@ -151,19 +164,31 @@ export const useViewerStore = defineStore('viewer', () => {
       }
       if (modelList.some((m) => m.status === 'processing')) void pollProcessing()
     } catch (e) {
-      error.value = describe(e)
+      offline.value = !models.value.length
+      error.value = offline.value ? null : describe(e)
+    } finally {
+      loading.value = false
     }
   }
 
   /** Models re-parsed after an upgrade show up as "processing"; refresh the list until they are done. */
   async function pollProcessing(): Promise<void> {
-    while (models.value.some((m) => m.status === 'processing')) {
-      await sleep(1500)
-      models.value = await api.listModels()
-    }
-    if (!currentId.value) {
-      const ready = models.value.find((m) => m.status === 'ready')
-      if (ready) await selectModel(ready.id)
+    if (polling) return
+    polling = true
+    try {
+      while (models.value.some((m) => m.status === 'processing')) {
+        await sleep(1500)
+        // An upload polls its own model; do not overwrite the list underneath it.
+        if (!uploading.value) models.value = await api.listModels()
+      }
+      if (!currentId.value) {
+        const ready = models.value.find((m) => m.status === 'ready')
+        if (ready) await selectModel(ready.id)
+      }
+    } catch (e) {
+      error.value = describe(e)
+    } finally {
+      polling = false
     }
   }
 
@@ -179,24 +204,48 @@ export const useViewerStore = defineStore('viewer', () => {
   }
 
   async function selectModel(id: string): Promise<void> {
-    if (currentId.value === id && elements.value.length) return
+    if (currentId.value === id && elements.value.length) {
+      // Going back to the model on screen cancels a switch that is still loading.
+      modelRequest++
+      loading.value = false
+      return
+    }
+    // Switching models quickly must not let a slow, older response win over the latest choice.
+    const request = ++modelRequest
     loading.value = true
     error.value = null
-    selectedId.value = null
-    selectedDetail.value = null
-    resetView()
     try {
-      await loadModelData(id)
+      const [elementList, carbonSummary, materialList] = await Promise.all([
+        api.listElements(id),
+        api.getCarbon(id),
+        api.getMaterials(id),
+      ])
+      if (request !== modelRequest) return
+      selectedId.value = null
+      selectedDetail.value = null
+      hoveredId.value = null
+      resetView()
+      elements.value = elementList
+      carbon.value = carbonSummary
+      materials.value = materialList
       currentId.value = id
       syncUrl()
     } catch (e) {
-      error.value = describe(e)
+      if (request === modelRequest) error.value = describe(e)
     } finally {
-      loading.value = false
+      if (request === modelRequest) loading.value = false
     }
   }
 
   async function upload(file: File): Promise<void> {
+    if (uploading.value) {
+      error.value = 'Another file is still being uploaded.'
+      return
+    }
+    if (!file.name.toLowerCase().endsWith('.ifc')) {
+      error.value = 'Only .ifc files are supported.'
+      return
+    }
     uploading.value = true
     uploadProgress.value = 0
     uploadName.value = file.name
@@ -226,7 +275,15 @@ export const useViewerStore = defineStore('viewer', () => {
   }
 
   async function removeModel(id: string): Promise<void> {
-    await api.deleteModel(id)
+    try {
+      await api.deleteModel(id)
+    } catch (e) {
+      // Already gone on the server is as good as deleted; anything else is worth telling.
+      if (!(e instanceof ApiError && e.status === 404)) {
+        error.value = describe(e)
+        return
+      }
+    }
     models.value = models.value.filter((m) => m.id !== id)
     if (currentId.value === id) {
       currentId.value = null
@@ -235,10 +292,17 @@ export const useViewerStore = defineStore('viewer', () => {
       materials.value = []
       selectedId.value = null
       selectedDetail.value = null
+      hoveredId.value = null
+      resetView()
       syncUrl()
       const next = models.value.find((m) => m.status === 'ready')
       if (next) await selectModel(next.id)
     }
+  }
+
+  /** Uploads that could not be parsed stay in the list until someone removes them. */
+  async function removeFailedModels(): Promise<void> {
+    for (const model of models.value.filter((m) => m.status === 'failed')) await removeModel(model.id)
   }
 
   async function select(globalId: string | null, openTab = true): Promise<void> {
@@ -248,9 +312,11 @@ export const useViewerStore = defineStore('viewer', () => {
     if (!globalId || !currentId.value) return
     if (openTab) activeTab.value = 'selection'
     try {
-      selectedDetail.value = await api.getElement(currentId.value, globalId)
+      const detail = await api.getElement(currentId.value, globalId)
+      // The user may have clicked something else while this was loading.
+      if (selectedId.value === globalId) selectedDetail.value = detail
     } catch (e) {
-      error.value = describe(e)
+      if (selectedId.value === globalId) error.value = describe(e)
     }
   }
 
@@ -272,7 +338,11 @@ export const useViewerStore = defineStore('viewer', () => {
       const meta = await api.putMapping(id, { overrides: next })
       models.value = models.value.map((m) => (m.id === id ? meta : m))
       await loadModelData(id)
-      if (selectedId.value) selectedDetail.value = await api.getElement(id, selectedId.value)
+      const selected = selectedId.value
+      if (selected) {
+        const detail = await api.getElement(id, selected)
+        if (selectedId.value === selected) selectedDetail.value = detail
+      }
     } catch (e) {
       error.value = describe(e)
     } finally {
@@ -359,7 +429,9 @@ export const useViewerStore = defineStore('viewer', () => {
     hoveredElement,
     selectedElement,
     activeTab,
+    panelCollapsed,
     loading,
+    offline,
     uploading,
     uploadProgress,
     uploadName,
@@ -380,6 +452,7 @@ export const useViewerStore = defineStore('viewer', () => {
     selectModel,
     upload,
     removeModel,
+    removeFailedModels,
     select,
     setMaterialCategory,
     saveOverrides,

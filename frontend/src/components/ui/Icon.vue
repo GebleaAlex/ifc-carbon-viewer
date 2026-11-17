@@ -30,6 +30,7 @@ const PATHS: Record<string, string> = {
   warning: 'M12 9v4m0 4h.01M10.3 4 2.6 18a2 2 0 0 0 1.7 3h15.4a2 2 0 0 0 1.7-3L13.7 4a2 2 0 0 0-3.4 0Z',
   file: 'M14 3H6a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8l-5-5Zm0 0v5h5',
   more: 'M5 12h.01M12 12h.01M19 12h.01',
+  panel: 'M4 5h16v14H4zM15 5v14',
   storey: 'M3 20h18M5 20V9l7-5 7 5v11M9 20v-5h6v5',
 }
 </script>

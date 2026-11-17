@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useViewerStore } from '../stores/viewer'
 import { formatCarbon } from '../lib/colors'
 import { matchesFocus } from '../lib/aggregate'
@@ -35,12 +35,17 @@ const filtered = computed(() => {
     if (sort.value === 'carbon') return (b.carbon_kgco2e ?? -1) - (a.carbon_kgco2e ?? -1)
     if (sort.value === 'class') return a.ifc_class.localeCompare(b.ifc_class) || (a.name ?? '').localeCompare(b.name ?? '')
     if (sort.value === 'storey')
-      return (storeyIndex.get(a.storey ?? '') ?? -1) - (storeyIndex.get(b.storey ?? '') ?? -1)
+      return (
+        (storeyIndex.get(a.storey ?? '') ?? -1) - (storeyIndex.get(b.storey ?? '') ?? -1) ||
+        (b.carbon_kgco2e ?? -1) - (a.carbon_kgco2e ?? -1)
+      )
     return (a.name ?? '').localeCompare(b.name ?? '', undefined, { numeric: true })
   })
 })
 const shown = computed(() => filtered.value.slice(0, limit.value))
 watch([query, sort, () => store.focus], () => (limit.value = PAGE))
+// Clicking a row switches to the Selection tab, so this list goes away without a mouseleave.
+onBeforeUnmount(() => (store.hoveredId = null))
 </script>
 
 <template>
@@ -52,6 +57,7 @@ watch([query, sort, () => store.focus], () => (limit.value = PAGE))
           v-model="query"
           type="search"
           placeholder="Name, class, storey, material…"
+          aria-label="Search elements"
           class="h-8 w-full bg-transparent text-sm outline-none placeholder:text-ink-500"
         />
       </div>
@@ -70,6 +76,7 @@ watch([query, sort, () => store.focus], () => (limit.value = PAGE))
         <button
           class="flex w-full items-center gap-3 px-3 py-2 text-left text-xs transition hover:bg-ink-700/60"
           :class="store.selectedId === el.global_id ? 'bg-ink-700/80' : ''"
+          :aria-current="store.selectedId === el.global_id ? 'true' : undefined"
           @click="store.select(el.global_id)"
           @mouseenter="store.hoveredId = el.global_id"
           @mouseleave="store.hoveredId = null"

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, nextTick } from 'vue'
 import { useViewerStore, type PanelTab } from '../stores/viewer'
 import OverviewPanel from './OverviewPanel.vue'
 import ElementsPanel from './ElementsPanel.vue'
@@ -14,16 +14,34 @@ const tabs: { value: PanelTab; label: string }[] = [
   { value: 'materials', label: 'Materials' },
   { value: 'selection', label: 'Selection' },
 ]
+
+/** Arrow keys, Home and End move between tabs, as the tablist pattern expects. */
+function onTabKey(event: KeyboardEvent) {
+  const index = tabs.findIndex((t) => t.value === store.activeTab)
+  let next = index
+  if (event.key === 'ArrowRight') next = (index + 1) % tabs.length
+  else if (event.key === 'ArrowLeft') next = (index - 1 + tabs.length) % tabs.length
+  else if (event.key === 'Home') next = 0
+  else if (event.key === 'End') next = tabs.length - 1
+  else return
+  event.preventDefault()
+  store.activeTab = tabs[next]!.value
+  const list = event.currentTarget as HTMLElement
+  void nextTick(() => list.querySelector<HTMLElement>('[aria-selected="true"]')?.focus())
+}
 </script>
 
 <template>
   <aside class="panel flex flex-col lg:min-h-0 lg:overflow-hidden">
-    <nav class="flex border-b border-ink-700/80 px-1 text-sm" role="tablist">
+    <nav class="flex border-b border-ink-700/80 px-1 text-sm" role="tablist" aria-label="Model details" @keydown="onTabKey">
       <button
         v-for="tab in tabs"
         :key="tab.value"
+        :id="`tab-${tab.value}`"
         role="tab"
-        class="relative flex flex-1 items-center justify-center gap-1.5 px-2 py-2.5 font-medium transition"
+        aria-controls="side-panel-body"
+        :tabindex="store.activeTab === tab.value ? 0 : -1"
+        class="relative flex flex-1 items-center justify-center gap-1.5 whitespace-nowrap px-1.5 py-2.5 font-medium transition sm:px-2"
         :class="store.activeTab === tab.value ? 'text-ink-100' : 'text-ink-300 hover:text-ink-100'"
         :aria-selected="store.activeTab === tab.value"
         @click="store.activeTab = tab.value"
@@ -43,7 +61,7 @@ const tabs: { value: PanelTab; label: string }[] = [
         />
       </button>
     </nav>
-    <div class="p-3 lg:min-h-0 lg:flex-1 lg:overflow-auto">
+    <div id="side-panel-body" role="tabpanel" :aria-labelledby="`tab-${store.activeTab}`" class="p-3 lg:min-h-0 lg:flex-1 lg:overflow-auto">
       <OverviewPanel v-if="store.activeTab === 'overview'" />
       <ElementsPanel v-else-if="store.activeTab === 'elements'" />
       <MaterialsPanel v-else-if="store.activeTab === 'materials'" />

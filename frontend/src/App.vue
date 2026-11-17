@@ -2,6 +2,7 @@
 import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useViewerStore } from './stores/viewer'
 import { viewerBridge } from './lib/viewerBridge'
+import { confirmState } from './lib/confirm'
 import type { ColorMode } from './lib/colors'
 import TopBar from './components/TopBar.vue'
 import ViewerPanel from './components/ViewerPanel.vue'
@@ -21,6 +22,7 @@ const SHORTCUTS: [string, string][] = [
   ['Shift H', 'Show everything'],
   ['X', 'X-ray'],
   ['S', 'Section cut'],
+  ['P', 'Hide or show the side panel'],
   ['1 – 4', 'Colour by material, carbon, class, storey'],
   ['Esc', 'Clear focus, then selection'],
   ['?', 'This list'],
@@ -31,6 +33,8 @@ function onKey(event: KeyboardEvent) {
   const target = event.target as HTMLElement | null
   if (target && (target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName))) return
   if (event.ctrlKey || event.metaKey || event.altKey) return
+  // A confirmation is waiting for an answer: nothing behind it should react to the keyboard.
+  if (confirmState.value) return
   const key = event.key.toLowerCase()
   if (key === 'escape') {
     if (helpOpen.value) helpOpen.value = false
@@ -47,6 +51,7 @@ function onKey(event: KeyboardEvent) {
   else if (key === 'h') store.hideSelected()
   else if (key === 'x') store.xray = !store.xray
   else if (key === 's') store.sectionEnabled = !store.sectionEnabled
+  else if (key === 'p') store.panelCollapsed = !store.panelCollapsed
   else if (['1', '2', '3', '4'].includes(key)) store.colorMode = MODES[Number(key) - 1]!
   else return
   event.preventDefault()
@@ -72,10 +77,12 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
   <div class="flex h-full flex-col">
     <TopBar @help="helpOpen = true" />
     <main
-      class="grid min-h-0 flex-1 grid-cols-1 grid-rows-[minmax(420px,62vh)_auto] gap-3 overflow-auto p-3 lg:grid-cols-[minmax(0,1fr)_400px] lg:grid-rows-1 lg:overflow-hidden"
+      class="grid min-h-0 flex-1 grid-cols-1 grid-rows-[minmax(360px,58vh)_auto] gap-3 overflow-auto p-2 sm:p-3 lg:grid-rows-1 lg:overflow-hidden"
+      :class="store.panelCollapsed ? 'lg:grid-cols-1' : 'lg:grid-cols-[minmax(0,1fr)_400px]'"
     >
       <ViewerPanel />
-      <SidePanel class="lg:min-h-0" />
+      <!-- Collapsing only applies to the side-by-side layout; stacked on a phone the panel is the page. -->
+      <SidePanel class="lg:min-h-0" :class="{ 'lg:hidden': store.panelCollapsed }" />
     </main>
     <UploadDropzone />
     <ConfirmDialog />
@@ -123,7 +130,9 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
                 <dd class="text-ink-200">{{ label }}</dd>
               </template>
             </dl>
-            <p class="mt-4 text-xs text-ink-500">Drag to orbit · right-drag to pan · scroll to zoom · click to select</p>
+            <p class="mt-4 text-xs text-ink-500">
+              Drag to orbit · right-drag to pan · scroll to zoom · click to select · double-click to zoom to an element
+            </p>
           </div>
         </div>
       </Transition>

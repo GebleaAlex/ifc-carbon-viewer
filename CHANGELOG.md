@@ -1,5 +1,33 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- **Utility classes on buttons, pills and chips were ignored.** The component classes (`.btn`, `.tool`, `.pill`, `.chip`, …) were unlayered CSS, which always beats Tailwind utilities. The keyboard button never hid on phones, warning chips were not yellow, compact buttons were not compact. They now live in the components layer.
+- **A tooltip stayed stuck in the 3D view** after hovering or clicking a row in the Elements list. Hovering a row now highlights that element in the model instead, and the tooltip only follows the pointer inside the view. Near the right and bottom edges it flips instead of being cut off.
+- **Fast clicks could show the wrong data.** Selecting two elements, or switching between two models, in quick succession let the slower response win: properties of another element, or two models drawn on top of each other.
+- **Escape did too much.** Closing a dropdown, the storey/class popover, the export menu or a confirmation also cleared the focus or the selection behind it. Shortcuts no longer fire while a confirmation is open.
+- **Failed uploads could not be removed**, and deleting a model while it was still being parsed brought it back. Deleting now reports errors instead of failing silently.
+- **Screenshots had a transparent background**; they are now exported on the same dark backdrop as the view.
+- The "only" action in the storey list was hover-only, so unreachable on touch screens. Dropdowns and popovers no longer hang off narrow screens.
+- Copying a link no longer claims success when the browser refuses clipboard access.
+
+### Added
+
+- Double-click an element to zoom to it; double-click empty space to fit the model.
+- Hide the side panel (`P`) to give the 3D view the whole window.
+- The selection actions and the section slider are shown together, and no longer overlap the legend.
+- A retry screen when the API cannot be reached, instead of an empty viewer.
+- The browser tab shows the name of the open model.
+- Tabs can be changed with the arrow keys.
+
+### Changed
+
+- The 3D view only renders when something changes, so an idle page no longer keeps the GPU busy.
+- Moving the section plane no longer invalidates every material on each step.
+- More compact header and toolbars on phones.
+
 ## 0.2.0
 
 ### Fixed
